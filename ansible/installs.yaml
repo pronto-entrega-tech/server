@@ -1,0 +1,40 @@
+---
+- name: nvm is installed
+  script: ../assets/nvm-install-v0.39.2.sh
+  args:
+    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+
+- name: node lts is installed
+  shell: nvm install --lts && nvm use --lts
+
+- name: Apt is up-to-date
+  apt:
+    update_cache: true
+    upgrade: yes
+
+- name: Apt packages are installed
+  apt:
+    name:
+      - nginx
+      - postgresql
+      - postgis
+      - redis
+
+- name: Yarn is installed
+  community.general.npm:
+    name: yarn
+    global: yes
+
+- name: Refresh snap
+  shell: snap install core; snap refresh core
+
+- name: Snap packages are installed
+  community.general.snap:
+    name: certbot
+    classic: yes
+
+- name: Snap packages binaries are linked
+  file:
+    src: /snap/bin/certbot
+    dest: /usr/bin/certbot
+    state: link

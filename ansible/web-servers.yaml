@@ -1,0 +1,48 @@
+---
+- name: Firewall rules are setup
+  community.general.ufw:
+    rule: allow
+    name: "{{ item }}"
+  loop:
+    - OpenSSH
+    - Nginx Full
+
+- name: Firewall is enabled
+  community.general.ufw:
+    state: enabled
+
+- name: Nginx sites are copied
+  copy:
+    src: ../assets/nginx-sites/
+    dest: /etc/nginx/sites-available/
+  notify:
+    - Restart nginx
+
+- name: Nginx sites are enabled
+  file:
+    src: "/etc/nginx/sites-available/{{ item }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ item }}.conf"
+    state: link
+  loop: "{{ domains }}"
+  notify:
+    - Restart nginx
+
+- name: HTTPS certificates are setup
+  command:
+    argv:
+      - certbot
+      - certonly
+      - --nginx
+      - --non-interactive
+      - --agree-tos
+      - -m developer@prontoentrega.com
+      - "-d {{ domains | join(',') }}"
+  args:
+    creates: /etc/letsencrypt/live
+  notify:
+    - Restart nginx
+
+- name: Nginx is started
+  service:
+    name: nginx
+    state: started

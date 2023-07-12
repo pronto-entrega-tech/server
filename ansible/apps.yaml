@@ -1,0 +1,96 @@
+---
+# - name: Static dir is created
+#   file:
+#     path: "/var/www/static"
+#     state: directory
+
+# - name: Deploy users are created
+#   user:
+#     name: "{{ item.name }}-deployer"
+#     home: "/opt/{{ item.name }}"
+#   loop: "{{ apps }}"
+
+# - name: Deploy users authorized keys are setup
+#   ansible.posix.authorized_key:
+#     user: "{{ item.name }}-deployer"
+#     key: "{{ lookup('file', '../assets/' + item.name + '-deployer.pub') }}"
+#   loop: "{{ apps }}"
+
+# - name: Deploy script is copied
+#   copy:
+#     src: "../javascript/deploy.mjs"
+#     dest: "/opt/{{ item.name }}/"
+#   loop: "{{ apps }}"
+
+# - name: Apps shared dir is created
+#   file:
+#     path: "/opt/{{ item.name }}/shared"
+#     state: directory
+#   loop: "{{ apps }}"
+
+# - name: .env files are copied
+#   copy:
+#     src: "../assets/.{{ item.name }}.env"
+#     dest: "/opt/{{ item.name }}/shared/.env"
+#   loop: "{{ apps }}"
+
+- name: Key is copied
+  copy:
+    src: ../assets/git-cloner.key
+    dest: /tmp/git-cloner.key
+    mode: 0600
+
+- name: Repositories are copied
+  git:
+    key_file: /tmp/git-cloner.key
+    repo: "git@gitlab.com:pronto-entrega/{{ item.repo }}.git"
+    dest: "/opt/{{ item.name }}/deploy-cache"
+    version: 'main'
+    accept_newhostkey: yes
+  loop: "{{ apps }}"
+
+- name: Repositories dependencies are installed
+  community.general.yarn:
+    path: "/opt/{{ item.name }}/deploy-cache"
+    state: present
+  loop: "{{ apps }}"
+
+- name: Build Apps
+  command: "yarn {{ item.build }}"
+  args:
+    chdir: "/opt/{{ item.name }}/deploy-cache"
+  loop: "{{ apps }}"
+
+- name: zx is installed
+  community.general.yarn:
+    name: zx
+    global: yes
+    production: yes
+
+- name: Run deploy scripts
+  command: zx deploy.mjs
+  args:
+    chdir: "/opt/{{ item.name }}"
+  loop: "{{ apps }}"
+
+- name: pm2 is installed
+  community.general.yarn:
+    name: pm2
+    global: yes
+    production: yes
+
+- name: pm2 startup
+  command: pm2 startup systemd -u www-data
+  environment:
+    PATH: "{{ ansible_env.PATH }}"
+
+- name: Start apps
+  command: 'pm2 start index.js --name {{ item.name }}-blue --wait-ready --listen-timeout 10000'
+  become_user: www-data
+  args:
+    chdir: "/opt/{{ item.name }}/current"
+  loop: "{{ apps }}"
+
+- name: Pm2 save
+  become_user: www-data
+  command: pm2 save

@@ -1,0 +1,20 @@
+---
+- name: Main database is created
+  community.postgresql.postgresql_db:
+    name: main
+
+- name: Database web user is created
+  community.postgresql.postgresql_user:
+    db: main
+    name: web
+    password: "{{ lookup('env', 'DB_PASS') }}"
+
+- name: Postgresql is started
+  service:
+    name: postgresql
+    state: started
+
+- name: Redis is started
+  service:
+    name: redis
+    state: started

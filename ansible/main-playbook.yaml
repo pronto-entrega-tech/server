@@ -1,0 +1,23 @@
+---
+- name: Setup
+  hosts: machines
+  become: true
+  vars:
+    apps:
+      - { name: api, build: build, repo: api }
+      - { name: web-app, build: web:build, repo: main-app }
+    domains:
+      - prontoentrega.com.br
+      - www.prontoentrega.com.br
+      - api.prontoentrega.com.br
+      - static.prontoentrega.com.br
+  tasks:
+    # - import_tasks: installs.yaml
+    # - import_tasks: web-servers.yaml
+    - import_tasks: apps.yaml
+    # - import_tasks: databases.yaml
+  handlers:
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
